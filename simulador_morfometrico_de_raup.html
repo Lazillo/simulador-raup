@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador Morfométrico de Raup - Conchas de Moluscos 3D</title>
+  <!-- Tailwind CSS para diseño moderno -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome para iconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    /* Estilos personalizados para controles y scrollbars */
+    body {
+      background-color: #0b0f19;
+      color: #f3f4f6;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* Scrollbar estilizada */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+
+    /* Slider personalizado */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: #1f2937;
+      border-radius: 9999px;
+      height: 6px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 18px;
+      width: 18px;
+      border-radius: 50%;
+      background: #3b82f6;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+      transition: all 0.15s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #60a5fa;
+    }
+
+    /* Glassmorphism para paneles */
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-btn {
+      background: rgba(31, 41, 55, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-btn:hover {
+      background: rgba(55, 65, 81, 0.9);
+      border-color: rgba(59, 130, 246, 0.5);
+      transform: translateY(-1px);
+    }
+    .glass-btn.active {
+      background: rgba(37, 99, 235, 0.3);
+      border-color: #3b82f6;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+  </style>
+
+  <!-- Three.js Library & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col md:flex-row select-none">
+
+  <!-- Canvas WebGL de Three.js -->
+  <div id="canvas-container"></div>
+
+  <!-- Header Superior Movil / Badge Titulo -->
+  <div class="absolute top-4 left-4 z-10 pointer-events-auto">
+    <div class="glass-panel px-4 py-3 rounded-2xl flex items-center space-x-3 shadow-2xl">
+      <div class="p-2 bg-blue-600/20 text-blue-400 rounded-xl">
+        <i class="fa-solid fa-shapes text-xl"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-wide text-white">Modelo de Raup</h1>
+        <p class="text-xs text-gray-400">Simulador Morfométrico 3D de Conchas</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel Lateral Izquierdo: Controles y Parámetros -->
+  <div class="z-10 w-full md:w-96 p-4 flex flex-col h-full pointer-events-none justify-between">
+    
+    <!-- Espaciador Superior para no tapar el título -->
+    <div class="h-16"></div>
+
+    <!-- Contenedor Principal de Ajustes (scrollable) -->
+    <div class="glass-panel rounded-2xl p-5 overflow-y-auto pointer-events-auto max-h-[calc(100vh-140px)] shadow-2xl space-y-6">
+      
+      <!-- Preajustes / Especies -->
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider text-gray-400 block mb-2.5">
+          <i class="fa-solid fa-stamp mr-1.5 text-blue-400"></i>Preajustes Biol&oacute;gicos
+        </label>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="applyPreset('nautilus')" id="btn-nautilus" class="glass-btn p-2.5 rounded-xl text-xs font-medium flex items-center space-x-2 text-left active">
+            <i class="fa-solid fa-dharmachakra text-amber-400"></i>
+            <span>Nautilus / Amonite</span>
+          </button>
+          <button onclick="applyPreset('snail')" id="btn-snail" class="glass-btn p-2.5 rounded-xl text-xs font-medium flex items-center space-x-2 text-left">
+            <i class="fa-solid fa-spiral text-emerald-400"></i>
+            <span>Caracol Com&uacute;n</span>
+          </button>
+          <button onclick="applyPreset('turritella')" id="btn-turritella" class="glass-btn p-2.5 rounded-xl text-xs font-medium flex items-center space-x-2 text-left">
+            <i class="fa-solid fa-icicles text-purple-400"></i>
+            <span>Turritella</span>
+          </button>
+          <button onclick="applyPreset('bivalve')" id="btn-bivalve" class="glass-btn p-2.5 rounded-xl text-xs font-medium flex items-center space-x-2 text-left">
+            <i class="fa-solid fa-gem text-cyan-400"></i>
+            <span>Almeja / Bivalvo</span>
+          </button>
+          <button onclick="applyPreset('limpet')" id="btn-limpet" class="glass-btn p-2.5 rounded-xl text-xs font-medium flex items-center space-x-2 text-left col-span-2">
+            <i class="fa-solid fa-mountain text-rose-400"></i>
+            <span>Lapa / Pat&eacute;lido (Patella)</span>
+          </button>
+        </div>
+      </div>
+
+      <hr class="border-gray-800">
+
+      <!-- Deslizadores de Parámetros de Raup -->
+      <div class="space-y-4">
+        <div class="flex justify-between items-center">
+          <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">
+            <i class="fa-solid fa-sliders mr-1.5 text-blue-400"></i>Par&aacute;metros de Raup
+          </span>
+          <button onclick="resetCamera()" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+            <i class="fa-solid fa-arrow-rotate-left mr-1"></i> Centrar
+          </button>
+        </div>
+
+        <!-- W - Tasa de expansión -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between text-xs">
+            <span class="font-medium text-gray-300">W (Tasa de Expansi&oacute;n)</span>
+            <span id="val-W" class="font-mono text-blue-400 font-bold">2.00</span>
+          </div>
+          <input type="range" id="input-W" min="1.1" max="10.0" step="0.05" value="2.0" class="w-full">
+          <p class="text-[10px] text-gray-500">Ritmo de crecimiento del di&aacute;metro de la concha por vuelta.</p>
+        </div>
+
+        <!-- D - Distancia al eje -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between text-xs">
+            <span class="font-medium text-gray-300">D (Distancia al Eje)</span>
+            <span id="val-D" class="font-mono text-blue-400 font-bold">0.00</span>
+          </div>
+          <input type="range" id="input-D" min="0.0" max="0.8" step="0.01" value="0.0" class="w-full">
+          <p class="text-[10px] text-gray-500">Separaci&oacute;n entre la espira y el eje central (0 = solapadas).</p>
+        </div>
+
+        <!-- T - Traslación vertical -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between text-xs">
+            <span class="font-medium text-gray-300">T (Traslaci&oacute;n Vertical)</span>
+            <span id="val-T" class="font-mono text-blue-400 font-bold">1.20</span>
+          </div>
+          <input type="range" id="input-T" min="0.0" max="4.0" step="0.05" value="1.2" class="w-full">
+          <p class="text-[10px] text-gray-500">Desplazamiento vertical por vuelta (determina la altura de la espira).</p>
+        </div>
+
+        <!-- Control exclusivo para Bivalvos: Apertura de Valvas -->
+        <div id="container-opening" class="space-y-1.5 p-3 bg-blue-950/30 border border-blue-500/20 rounded-xl transition-all">
+          <div class="flex justify-between text-xs">
+            <span class="font-medium text-blue-300"><i class="fa-solid fa-door-open mr-1"></i>Apertura Valvas (Bivalvo)</span>
+            <span id="val-opening" class="font-mono text-cyan-400 font-bold">15&deg;</span>
+          </div>
+          <input type="range" id="input-opening" min="0" max="60" step="1" value="15" class="w-full">
+          <p class="text-[10px] text-gray-400">Simula el movimiento de la articulaci&039;on muscular/charnela.</p>
+        </div>
+
+      </div>
+
+      <hr class="border-gray-800">
+
+      <!-- Apariencia y Visualización -->
+      <div class="space-y-3">
+        <label class="text-xs font-semibold uppercase tracking-wider text-gray-400 block">
+          <i class="fa-solid fa-palette mr-1.5 text-blue-400"></i>Renderizado y Material
+        </label>
+
+        <div class="grid grid-cols-2 gap-2">
+          <!-- Modo Wireframe / Sólido -->
+          <button id="btn-wireframe" onclick="toggleWireframe()" class="glass-btn p-2 rounded-xl text-xs font-medium flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-border-none text-gray-400"></i>
+            <span id="txt-wireframe">Modo: S&oacute;lido</span>
+          </button>
+
+          <!-- Rotación Automática -->
+          <button id="btn-autorotate" onclick="toggleAutoRotate()" class="glass-btn p-2 rounded-xl text-xs font-medium flex items-center justify-center space-x-2 active">
+            <i class="fa-solid fa-rotate text-blue-400"></i>
+            <span>Rotaci&oacute;n Auto</span>
+          </button>
+        </div>
+
+        <!-- Color de Concha -->
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-xs text-gray-300">Color de la Concha:</span>
+          <div class="flex space-x-2">
+            <button onclick="changeColor('#f3f4f6')" class="w-6 h-6 rounded-full bg-slate-100 border border-white/20 hover:scale-110 transition-transform"></button>
+            <button onclick="changeColor('#d97706')" class="w-6 h-6 rounded-full bg-amber-600 border border-white/20 hover:scale-110 transition-transform"></button>
+            <button onclick="changeColor('#0284c7')" class="w-6 h-6 rounded-full bg-sky-600 border border-white/20 hover:scale-110 transition-transform"></button>
+            <button onclick="changeColor('#059669')" class="w-6 h-6 rounded-full bg-emerald-600 border border-white/20 hover:scale-110 transition-transform"></button>
+            <button onclick="changeColor('#e11d48')" class="w-6 h-6 rounded-full bg-rose-600 border border-white/20 hover:scale-110 transition-transform"></button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Panel Inferior / Modal Explicativo para Exposición -->
+  <div class="z-10 absolute bottom-4 right-4 left-4 md:left-auto md:w-[450px] pointer-events-auto">
+    <div class="glass-panel rounded-2xl p-4 shadow-2xl space-y-2 border-l-4 border-l-blue-500">
+      <div class="flex justify-between items-center cursor-pointer" onclick="toggleInfoPanel()">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center">
+          <i class="fa-solid fa-graduation-cap mr-2 text-sm"></i>Explicaci&oacute;n Did&aacute;ctica (Modelo de Raup)
+        </h3>
+        <i id="icon-info-toggle" class="fa-solid fa-chevron-down text-gray-400 text-xs transition-transform"></i>
+      </div>
+      <div id="info-content" class="text-xs text-gray-300 space-y-2 pt-1 leading-relaxed">
+        <p>
+          En 1966, el paleont&oacute;logo <strong>David Raup</strong> demostr&oacute; que la inmensa variedad de conchas de moluscos en la naturaleza se puede generar matem&aacute;ticamente variando solo 3 variables:
+        </p>
+        <ul class="list-disc pl-4 space-y-1 text-gray-400 text-[11px]">
+          "<li><strong class="text-gray-200">W (Expansi&oacute;n):</strong> Qu&eacute; tan r&aacute;pido se ensancha la abertura en cada revoluci&oacute;n.</li>"
+          "<li><strong class="text-gray-200">D (Distancia):</strong> Si el tubo toca el eje central (D=0) o deja un hueco/ombligo central (D&gt;0).</li>"
+          "<li><strong class="text-gray-200">T (Traslaci&oacute;n):</strong> Si el crecimiento es plano en 2D (T=0, Nautilus) o se estira a lo largo de una espiral en 3D (T&gt;0, Caracoles).</li>"
+        </ul>
+        <p class="text-[11px] text-cyan-400 font-medium bg-cyan-950/30 p-2 rounded-lg border border-cyan-500/20">
+          <strong>Nota de Morfolog&iacute;a Bivalva:</strong> Las almejas y mejillones no forman un tubo abierto continuo, sino dos valvas convexas sim&eacute;tricas acopladas por una charnela flexible.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT LÓGICA TRES.JS Y GEOMETRÍAS -->
+  <script>
+    // Variables globales de Three.js
+    let scene, camera, renderer, controls;
+    let currentMesh = null;
+    let currentType = 'nautilus';
+
+    // Parámetros por defecto de Raup
+    const params = {
+      W: 2.0,
+      D: 0.0,
+      T: 1.2,
+      valveOpening: 15, // grados para bivalvo
+      wireframe: false,
+      autoRotate: true,
+      color: 0xf3f4f6
+    };
+
+    // Preajustes exactos para cada organismo
+    const presets = {
+      nautilus: { W: 3.2, D: 0.0, T: 0.0, opening: 0, name: 'Nautilus / Amonite' },
+      snail: { W: 2.1, D: 0.05, T: 1.2, opening: 0, name: 'Caracol Común' },
+      turritella: { W: 1.25, D: 0.02, T: 3.2, opening: 0, name: 'Turritella (Caracol Largo)' },
+      bivalve: { W: 1.8, D: 0.1, T: 0.2, opening: 18, name: 'Almeja / Bivalvo' },
+      limpet: { W: 8.5, D: 0.0, T: 0.5, opening: 0, name: 'Lapa / Patella' }
+    };
+
+    // Inicialización de la escena
+    function init() {
+      const container = document.getElementById('canvas-container');
+
+      // Escena
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0b0f19);
+      scene.fog = new THREE.FogExp2(0x0b0f19, 0.03);
+
+      // Cámara
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 5, 15);
+
+      // Renderizador
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      // OrbitControls
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxDistance = 50;
+      controls.minDistance = 2;
+      controls.autoRotate = params.autoRotate;
+      controls.autoRotateSpeed = 2.0;
+
+      // Iluminación Profesional
+      setupLighting();
+
+      // Suelo / Cuadrícula sutil
+      const grid = new THREE.GridHelper(30, 30, 0x1e293b, 0x0f172a);
+      grid.position.y = -3.5;
+      scene.add(grid);
+
+      // Event listeners para controles e interfaz
+      setupUIListeners();
+
+      // Construir concha inicial
+      buildShell();
+
+      // Evento Resize
+      window.addEventListener('resize', onWindowResize);
+
+      // Iniciar Bucle de Animación
+      animate();
+    }
+
+    // Configuración de Luces
+    function setupLighting() {
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+
+      const mainLight = new THREE.DirectionalLight(0xffffff, 0.9);
+      mainLight.position.set(10, 20, 15);
+      mainLight.castShadow = true;
+      scene.add(mainLight);
+
+      const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.4);
+      fillLight.position.set(-10, -10, -10);
+      scene.add(fillLight);
+
+      const topLight = new THREE.PointLight(0x60a5fa, 0.5, 20);
+      topLight.position.set(0, 8, 0);
+      scene.add(topLight);
+    }
+
+    // Generador de Conchas basado en el tipo y parámetros
+    function buildShell() {
+      if (currentMesh) {
+        scene.remove(currentMesh);
+        // Liberar memoria de geometría y material
+        if (currentMesh.geometry) currentMesh.geometry.dispose();
+        if (Array.isArray(currentMesh.material)) {
+          currentMesh.material.forEach(m => m.dispose());
+        } else if (currentMesh.material) {
+          currentMesh.material.dispose();
+        }
+      }
+
+      const material = new THREE.MeshStandardMaterial({
+        color: params.color,
+        roughness: 0.35,
+        metalness: 0.1,
+        wireframe: params.wireframe,
+        side: THREE.DoubleSide
+      });
+
+      if (currentType === 'bivalve') {
+        // GEOMETRÍA CORREGIDA DE BIVALVO (Dos valvas acopladas con charnela)
+        currentMesh = createBivalveShell(material);
+      } else if (currentType === 'limpet') {
+        // GEOMETRÍA DE LAPA (Cónica en cúpula simple)
+        currentMesh = createLimpetShell(material);
+      } else {
+        // GEOMETRÍA TUBULAR PARAMÉTRICA DE RAUP (Gasterópodos / Cefalópodos)
+        currentMesh = createRaupTubularShell(material);
+      }
+
+      scene.add(currentMesh);
+    }
+
+    // 1. GEOMETRÍA PARAMÉTRICA TUBULAR DE RAUP (Gasterópodos / Cefalópodos)
+    function createRaupTubularShell(material) {
+      const group = new THREE.Group();
+      
+      const turns = currentType === 'turritella' ? 6 : (currentType === 'snail' ? 4 : 3);
+      const uSegments = 120;
+      const vSegments = 32;
+
+      const geometry = new THREE.BufferGeometry();
+      const vertices = [];
+      const indices = [];
+      const uvs = [];
+      const normals = [];
+
+      // Ecuaciones del modelo de Raup
+      // W = Tasa de expansión, D = Distancia al eje, T = Traslación vertical
+      const W = params.W;
+      const D = params.D;
+      const T = params.T;
+
+      for (let i = 0; i <= uSegments; i++) {
+        const u = (i / uSegments) * (turns * 2 * Math.PI); // ángulo teta
+        const scale = Math.pow(W, u / (2 * Math.PI)); // r(theta) = R0 * W^(theta/2pi)
+
+        // Radio de la sección transversal
+        const r_tube = 0.5 * scale * (1 - D);
+        // Distancia del centro del tubo al eje z
+        const R_center = scale * (1 + D);
+        // Altura vertical z
+        const Z_center = scale * T;
+
+        for (let j = 0; j <= vSegments; j++) {
+          const v = (j / vSegments) * 2 * Math.PI;
+
+          // Punto en la sección transversal elíptica
+          const dx = r_tube * Math.cos(v);
+          const dy = r_tube * Math.sin(v) * 1.2; // ligera elipse
+
+          // Posición en 3D
+          const x = (R_center + dx) * Math.cos(u);
+          const y = Z_center + dy;
+          const z = (R_center + dx) * Math.sin(u);
+
+          vertices.push(x, y, z);
+          uvs.push(i / uSegments, j / vSegments);
+        }
+      }
+
+      // Caras
+      for (let i = 0; i < uSegments; i++) {
+        for (let j = 0; j < vSegments; j++) {
+          const a = i * (vSegments + 1) + j;
+          const b = (i + 1) * (vSegments + 1) + j;
+          const c = (i + 1) * (vSegments + 1) + (j + 1);
+          const d = i * (vSegments + 1) + (j + 1);
+
+          indices.push(a, b, d);
+          indices.push(b, c, d);
+        }
+      }
+
+      geometry.setIndex(indices);
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.computeVertexNormals();
+
+      // Ajustar centro de masa
+      geometry.center();
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+
+      return group;
+    }
+
+    // 2. GEOMETRÍA CORREGIDA BIVALVO / ALMEJA (Valva Izquierda + Derecha articuladas)
+    function createBivalveShell(material) {
+      const group = new THREE.Group();
+
+      // Función para generar una sola valva convexa acorazonada con líneas de crecimiento
+      function createSingleValve(isRightValve) {
+        const uSegs = 40;
+        const vSegs = 40;
+        const geom = new THREE.BufferGeometry();
+        const positions = [];
+        const uvs = [];
+        const indices = [];
+
+        for (let i = 0; i <= uSegs; i++) {
+          const u = i / uSegs; // De umbo/bisagra (0) a margen de la valva (1)
+          const radius = Math.sin(u * Math.PI * 0.85) * (1 + u * 1.5); // Perfil convexo
+          
+          for (let j = 0; j <= vSegs; j++) {
+            const v = (j / vSegs) * Math.PI - (Math.PI / 2); // Ángulo en abanico (-pi/2 a pi/2)
+            
+            // Forma de concha acorazonada/ovalada
+            const x = radius * Math.cos(v) * 1.8;
+            const y = u * 3.0;
+            
+            // Abultamiento convexo de la concha
+            let z = Math.sin(u * Math.PI) * Math.cos(v * 0.8) * 1.1;
+
+            // Añadir suaves líneas de crecimiento concéntricas
+            const growthRipples = Math.sin(u * 35) * 0.04 * u;
+            z += growthRipples;
+
+            // Si es valva derecha, invertir la curvatura z
+            const zFinal = isRightValve ? -z : z;
+
+            positions.push(x, y, zFinal);
+            uvs.push(u, j / vSegs);
+          }
+        }
+
+        for (let i = 0; i < uSegs; i++) {
+          for (let j = 0; j < vSegs; j++) {
+            const first = i * (vSegs + 1) + j;
+            const second = first + vSegs + 1;
+
+            if (isRightValve) {
+              indices.push(first, second, first + 1);
+              indices.push(second, second + 1, first + 1);
+            } else {
+              indices.push(first, first + 1, second);
+              indices.push(second, first + 1, second + 1);
+            }
+          }
+        }
+
+        geom.setIndex(indices);
+        geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geom.computeVertexNormals();
+
+        const valveMesh = new THREE.Mesh(geom, material);
+        valveMesh.castShadow = true;
+        valveMesh.receiveShadow = true;
+        return valveMesh;
+      }
+
+      // Crear Valva Izquierda y Valva Derecha
+      const leftValve = createSingleValve(false);
+      const rightValve = createSingleValve(true);
+
+      // Angulo de apertura en radianes
+      const angleRad = (params.valveOpening * Math.PI) / 180;
+
+      // Rotar ambas valvas desde la bisagra (charnela posterior superior)
+      leftValve.rotation.x = angleRad / 2;
+      rightValve.rotation.x = -angleRad / 2;
+
+      group.add(leftValve);
+      group.add(rightValve);
+
+      // Dibuja una pequeña charnela / bisagra cilíndrica de acople
+      const hingeGeom = new THREE.CylinderGeometry(0.12, 0.12, 1.2, 16);
+      hingeGeom.rotateZ(Math.PI / 2);
+      const hingeMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.8 });
+      const hinge = new THREE.Mesh(hingeGeom, hingeMat);
+      hinge.position.set(0, 0, 0);
+      group.add(hinge);
+
+      // Centrar grupo
+      group.position.y = -1.5;
+
+      return group;
+    }
+
+    // 3. GEOMETRÍA DE LAPA / PATELLA (Cónica con cúpula)
+    function createLimpetShell(material) {
+      const group = new THREE.Group();
+      const radius = 3.0;
+      const height = 1.8;
+      const radialSegments = 64;
+      const heightSegments = 30;
+
+      const geom = new THREE.ConeGeometry(radius, height, radialSegments, heightSegments, true);
+      const pos = geom.attributes.position;
+
+      // Deformar cono para darle aspecto orgánico de lapa
+      for (let i = 0; i < pos.count; i++) {
+        let x = pos.getX(i);
+        let y = pos.getY(i);
+        let z = pos.getZ(i);
+
+        // Curvatura del perfil (no un cono perfecto)
+        const factor = Math.pow((y + height / 2) / height, 0.7);
+        x *= (1 + 0.1 * Math.sin(Math.atan2(z, x) * 7)); // Costillas radiales
+
+        pos.setXYZ(i, x, y, z);
+      }
+
+      geom.computeVertexNormals();
+      const mesh = new THREE.Mesh(geom, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+
+      return group;
+    }
+
+    // Asignación de Listeners de Interfaz
+    function setupUIListeners() {
+      // Sliders de Raup
+      const sliderW = document.getElementById('input-W');
+      const sliderD = document.getElementById('input-D');
+      const sliderT = document.getElementById('input-T');
+      const sliderOpening = document.getElementById('input-opening');
+
+      sliderW.addEventListener('input', (e) => {
+        params.W = parseFloat(e.target.value);
+        document.getElementById('val-W').textContent = params.W.toFixed(2);
+        buildShell();
+      });
+
+      sliderD.addEventListener('input', (e) => {
+        params.D = parseFloat(e.target.value);
+        document.getElementById('val-D').textContent = params.D.toFixed(2);
+        buildShell();
+      });
+
+      sliderT.addEventListener('input', (e) => {
+        params.T = parseFloat(e.target.value);
+        document.getElementById('val-T').textContent = params.T.toFixed(2);
+        buildShell();
+      });
+
+      sliderOpening.addEventListener('input', (e) => {
+        params.valveOpening = parseInt(e.target.value);
+        document.getElementById('val-opening').textContent = `${params.valveOpening}°`;
+        buildShell();
+      });
+    }
+
+    // Aplicar Preajustes de Especies
+    function applyPreset(presetKey) {
+      currentType = presetKey;
+      const p = presets[presetKey];
+
+      // Actualizar variables y sliders
+      params.W = p.W;
+      params.D = p.D;
+      params.T = p.T;
+      params.valveOpening = p.opening;
+
+      document.getElementById('input-W').value = p.W;
+      document.getElementById('val-W').textContent = p.W.toFixed(2);
+
+      document.getElementById('input-D').value = p.D;
+      document.getElementById('val-D').textContent = p.D.toFixed(2);
+
+      document.getElementById('input-T').value = p.T;
+      document.getElementById('val-T').textContent = p.T.toFixed(2);
+
+      document.getElementById('input-opening').value = p.opening;
+      document.getElementById('val-opening').textContent = `${p.opening}°`;
+
+      // Mostrar/ocultar control de apertura según sea bivalvo
+      const openingContainer = document.getElementById('container-opening');
+      if (presetKey === 'bivalve') {
+        openingContainer.classList.remove('opacity-40', 'pointer-events-none');
+      } else {
+        openingContainer.classList.add('opacity-40', 'pointer-events-none');
+      }
+
+      // Actualizar estilo de botones activos
+      const btnIds = ['nautilus', 'snail', 'turritella', 'bivalve', 'limpet'];
+      btnIds.forEach(id => {
+        const btn = document.getElementById(`btn-${id}`);
+        if (id === presetKey) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      // Reconstruir
+      buildShell();
+    }
+
+    // Cambiar Modo Wireframe
+    function toggleWireframe() {
+      params.wireframe = !params.wireframe;
+      const btn = document.getElementById('btn-wireframe');
+      const txt = document.getElementById('txt-wireframe');
+      
+      if (params.wireframe) {
+        btn.classList.add('active');
+        txt.textContent = 'Modo: Malla';
+      } else {
+        btn.classList.remove('active');
+        txt.textContent = 'Modo: Sólido';
+      }
+
+      if (currentMesh) {
+        currentMesh.traverse((child) => {
+          if (child.isMesh && child.material) {
+            child.material.wireframe = params.wireframe;
+          }
+        });
+      }
+    }
+
+    // Cambiar Rotación Automática
+    function toggleAutoRotate() {
+      params.autoRotate = !params.autoRotate;
+      controls.autoRotate = params.autoRotate;
+      const btn = document.getElementById('btn-autorotate');
+      if (params.autoRotate) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+
+    // Cambiar Color de Material
+    function changeColor(hexColor) {
+      params.color = hexColor;
+      if (currentMesh) {
+        currentMesh.traverse((child) => {
+          if (child.isMesh && child.material) {
+            child.material.color.set(hexColor);
+          }
+        });
+      }
+    }
+
+    // Centrar Cámara
+    function resetCamera() {
+      camera.position.set(0, 5, 15);
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+
+    // Desplegar/Plegar Panel Informativo
+    function toggleInfoPanel() {
+      const content = document.getElementById('info-content');
+      const icon = document.getElementById('icon-info-toggle');
+      content.classList.toggle('hidden');
+      icon.classList.toggle('rotate-180');
+    }
+
+    // Redimensionado de Ventana
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // Bucle de Renderizado
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Inicializar la App al Cargar la Página
+    window.onload = function() {
+      init();
+      applyPreset('nautilus'); // Estado inicial
+    };
+  </script>
+</body>
+</html>
